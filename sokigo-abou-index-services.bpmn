@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bioc="http://bpmn.io/schema/bpmn/biocolor/1.0" xmlns:color="http://www.omg.org/spec/BPMN/non-normative/color/1.0" id="Definitions_0sdny8d" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.16.0">
+  <bpmn:collaboration id="Collaboration_1vlu0n3">
+    <bpmn:participant id="Participant_1b38ks9" name="INDEX SERVICES FROM ABOU" processRef="sokigo-abou-index-services.git" />
+  </bpmn:collaboration>
+  <bpmn:process id="sokigo-abou-index-services.git" name="Onify Blueprint: Index services from Sokigo Abou" isExecutable="true">
+    <bpmn:laneSet id="LaneSet_02o4jdr">
+      <bpmn:lane id="Lane_0ougcvv" name="Onify">
+        <bpmn:flowNodeRef>transform</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>settings</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>index</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>wait</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>purge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>cleanup</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>end</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_10vswlw" name="Abou">
+        <bpmn:flowNodeRef>services</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>authenticate</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:sequenceFlow id="Flow_07nd58u" sourceRef="services" targetRef="transform" />
+    <bpmn:sequenceFlow id="Flow_1l3tv0h" sourceRef="settings" targetRef="authenticate" />
+    <bpmn:scriptTask id="transform" name="Transform services" scriptFormat="javascript">
+      <bpmn:extensionElements>
+        <camunda:inputOutput>
+          <camunda:inputParameter name="state">
+            <camunda:script scriptFormat="js">next(null, {name: content.name, id: content.id});</camunda:script>
+          </camunda:inputParameter>
+          <camunda:outputParameter name="state">
+            <camunda:script scriptFormat="js">next(null, {id: content.id, result: {done: true}});</camunda:script>
+          </camunda:outputParameter>
+          <camunda:outputParameter name="itemsToIndex">${content.output}</camunda:outputParameter>
+        </camunda:inputOutput>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_07nd58u</bpmn:incoming>
+      <bpmn:outgoing>Flow_06nzi8a</bpmn:outgoing>
+      <bpmn:script>if (!environment.output.services) {
+    next(null, []);
+}
+
+String.prototype.slugify = function () {
+    return this
+        .toString()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9 ]/g, '')
+};
+
+const itemsToIndex = [];
+environment.output.services.forEach(async function(service) {
+    const itemToIndex = {
+        type: "service",
+        key: `service-${service.ServiceShortName.slugify()}`,
+        name: service.ServiceDisplayName,
+        tag: ["service", "abou"],
+        hash: environment.settings.processId,
+        status: service.ServiceIsActive ? 'Active' : 'Inactive',
+        action: [{
+          name: 'Start service',
+          url: `${environment.output.settings._abou_url}${service.ServiceUrl}`,
+          target: '_blank' 
+        }],
+        attribute: {
+          service_short_name: service.ServiceShortName,
+          service_display_name: service.ServiceDisplayName,
+          service_url: service.ServiceUrl,
+          service_is_active: service.ServiceIsActive,
+          service_is_open: service.ServiceIsOpen,
+          service_open_from: service.ServiceOpenFrom,
+          service_open_to: service.ServiceOpenTo,
+          service_window_from: service.ServiceWindowFrom,
+          service_window_to: service.ServiceWindowTo,
+          service_has_authentication: service.ServiceHasAuthentication,
+          service_has_signing: service.ServiceHasSigning,
+          service_has_multiple_signing: service.ServiceHasMultipleSigning,
+          service_has_alternative_signing: service.ServiceHasAlternativeSigning,
+          service_has_decision: service.ServiceHasDecision,
+          service_last_updated: service.ServiceLastUpdated,
+          organisation_name: service.OrganisationName,
+          case_status_list: service.CaseStatusList  
+        }
+    };
+    itemsToIndex.push(itemToIndex);
+})
+
+next(null, itemsToIndex);</bpmn:script>
+    </bpmn:scriptTask>
+    <bpmn:serviceTask id="settings" name="Get settings">
+      <bpmn:extensionElements>
+        <camunda:connector>
+          <camunda:inputOutput>
+            <camunda:inputParameter name="query">
+              <camunda:map>
+                <camunda:entry key="tag">abou</camunda:entry>
+              </camunda:map>
+            </camunda:inputParameter>
+            <camunda:inputParameter name="url">/my/config/settings</camunda:inputParameter>
+          </camunda:inputOutput>
+          <camunda:connectorId>onifyApiRequest</camunda:connectorId>
+        </camunda:connector>
+        <camunda:inputOutput>
+          <camunda:inputParameter name="state">
+            <camunda:script scriptFormat="js">next(null, {name: content.name, id: content.id});</camunda:script>
+          </camunda:inputParameter>
+          <camunda:outputParameter name="settings">${content.output.body}</camunda:outputParameter>
+          <camunda:outputParameter name="state">
+            <camunda:script scriptFormat="js">next(null, {id: content.id, result: {done: true}});</camunda:script>
+          </camunda:outputParameter>
+        </camunda:inputOutput>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_0wk332j</bpmn:incoming>
+      <bpmn:outgoing>Flow_1l3tv0h</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_06nzi8a" sourceRef="transform" targetRef="index" />
+    <bpmn:sequenceFlow id="Flow_0wk332j" sourceRef="start" targetRef="settings" />
+    <bpmn:serviceTask id="index" name="Index services">
+      <bpmn:extensionElements>
+        <camunda:connector>
+          <camunda:inputOutput>
+            <camunda:inputParameter name="payload">${environment.output.itemsToIndex}</camunda:inputParameter>
+            <camunda:inputParameter name="method">POST</camunda:inputParameter>
+            <camunda:inputParameter name="url">/admin/bulk/items</camunda:inputParameter>
+          </camunda:inputOutput>
+          <camunda:connectorId>onifyApiRequest</camunda:connectorId>
+        </camunda:connector>
+        <camunda:inputOutput>
+          <camunda:inputParameter name="state">
+            <camunda:script scriptFormat="js">next(null, {name: content.name, id: content.id});</camunda:script>
+          </camunda:inputParameter>
+          <camunda:outputParameter name="state">
+            <camunda:script scriptFormat="js">next(null, {id: content.id, result: {done: true}});</camunda:script>
+          </camunda:outputParameter>
+        </camunda:inputOutput>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_06nzi8a</bpmn:incoming>
+      <bpmn:outgoing>Flow_0so2spd</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:startEvent id="start" name="Index services">
+      <bpmn:outgoing>Flow_0wk332j</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="services" name="Get services from Abou">
+      <bpmn:extensionElements>
+        <camunda:connector>
+          <camunda:inputOutput>
+            <camunda:inputParameter name="responseType">json</camunda:inputParameter>
+            <camunda:inputParameter name="headers">
+              <camunda:map>
+                <camunda:entry key="Authorization">Bearer ${environment.output.accessToken}</camunda:entry>
+                <camunda:entry key="Content-Type">application/json</camunda:entry>
+              </camunda:map>
+            </camunda:inputParameter>
+            <camunda:inputParameter name="url">${environment.output.settings._abou_url}/api/v2/services/GetServices</camunda:inputParameter>
+            <camunda:inputParameter name="method">GET</camunda:inputParameter>
+            <camunda:inputParameter name="method">POST</camunda:inputParameter>
+            <camunda:inputParameter name="json">
+              <camunda:map />
+            </camunda:inputParameter>
+          </camunda:inputOutput>
+          <camunda:connectorId>httpRequest</camunda:connectorId>
+        </camunda:connector>
+        <camunda:inputOutput>
+          <camunda:inputParameter name="state">
+            <camunda:script scriptFormat="js">next(null, {name: content.name, id: content.id});</camunda:script>
+          </camunda:inputParameter>
+          <camunda:outputParameter name="services">${content.output.body.Result}</camunda:outputParameter>
+          <camunda:outputParameter name="state">
+            <camunda:script scriptFormat="js">next(null, {id: content.id, result: {done: true}});</camunda:script>
+          </camunda:outputParameter>
+        </camunda:inputOutput>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_0t7vdw4</bpmn:incoming>
+      <bpmn:outgoing>Flow_07nd58u</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="authenticate" name="Authenticate and get token">
+      <bpmn:extensionElements>
+        <camunda:connector>
+          <camunda:inputOutput>
+            <camunda:inputParameter name="headers">
+              <camunda:script scriptFormat="js">next(null, {
+  Authorization: 'Basic ' + Buffer.from(environment.output.settings._abou_username + ':' + environment.output.settings._abou_apikey).toString('base64')
+});</camunda:script>
+            </camunda:inputParameter>
+            <camunda:inputParameter name="url">${environment.output.settings._abou_url}/api/authenticate/AAA</camunda:inputParameter>
+          </camunda:inputOutput>
+          <camunda:connectorId>httpRequest</camunda:connectorId>
+        </camunda:connector>
+        <camunda:inputOutput>
+          <camunda:inputParameter name="state">
+            <camunda:script scriptFormat="js">next(null, {name: content.name, id: content.id});</camunda:script>
+          </camunda:inputParameter>
+          <camunda:outputParameter name="accessToken">${content.output.body}</camunda:outputParameter>
+          <camunda:outputParameter name="state">
+            <camunda:script scriptFormat="js">next(null, {id: content.id, result: {done: true}});</camunda:script>
+          </camunda:outputParameter>
+        </camunda:inputOutput>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1l3tv0h</bpmn:incoming>
+      <bpmn:outgoing>Flow_0t7vdw4</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_0t7vdw4" sourceRef="authenticate" targetRef="services" />
+    <bpmn:sequenceFlow id="Flow_10n8ngo" sourceRef="cleanup" targetRef="end" />
+    <bpmn:intermediateCatchEvent id="wait" name="Wait until indexed (2 seconds)">
+      <bpmn:incoming>Flow_0so2spd</bpmn:incoming>
+      <bpmn:outgoing>Flow_1upg7hs</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerEventDefinition_0hj39y8">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT2S</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="purge" name="Purge obsolete services">
+      <bpmn:extensionElements>
+        <camunda:connector>
+          <camunda:inputOutput>
+            <camunda:inputParameter name="method">DELETE</camunda:inputParameter>
+            <camunda:inputParameter name="url">/admin/items</camunda:inputParameter>
+            <camunda:inputParameter name="query">
+              <camunda:map>
+                <camunda:entry key="includeQuery">type:service AND tag:abou AND -hash:${environment.settings.processId}</camunda:entry>
+                <camunda:entry key="whatIf">false</camunda:entry>
+              </camunda:map>
+            </camunda:inputParameter>
+          </camunda:inputOutput>
+          <camunda:connectorId>onifyApiRequest</camunda:connectorId>
+        </camunda:connector>
+        <camunda:inputOutput>
+          <camunda:inputParameter name="state">
+            <camunda:script scriptFormat="js">next(null, {name: content.name, id: content.id});</camunda:script>
+          </camunda:inputParameter>
+          <camunda:outputParameter name="state">
+            <camunda:script scriptFormat="js">next(null, {id: content.id, result: {done: true}});</camunda:script>
+          </camunda:outputParameter>
+        </camunda:inputOutput>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1upg7hs</bpmn:incoming>
+      <bpmn:outgoing>Flow_19bofdm</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_1upg7hs" sourceRef="wait" targetRef="purge" />
+    <bpmn:sequenceFlow id="Flow_0so2spd" sourceRef="index" targetRef="wait" />
+    <bpmn:sequenceFlow id="Flow_19bofdm" sourceRef="purge" targetRef="cleanup" />
+    <bpmn:scriptTask id="cleanup" name="Clean up process" scriptFormat="js">
+      <bpmn:incoming>Flow_19bofdm</bpmn:incoming>
+      <bpmn:outgoing>Flow_10n8ngo</bpmn:outgoing>
+      <bpmn:script>environment.output.services = [];
+environment.output.itemsToIndex = [];
+environment.output.settings = {};
+
+next();</bpmn:script>
+    </bpmn:scriptTask>
+    <bpmn:endEvent id="end" name="Services indexed">
+      <bpmn:extensionElements />
+      <bpmn:incoming>Flow_10n8ngo</bpmn:incoming>
+    </bpmn:endEvent>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_1vlu0n3">
+      <bpmndi:BPMNShape id="Participant_1b38ks9_di" bpmnElement="Participant_1b38ks9" isHorizontal="true">
+        <dc:Bounds x="190" y="120" width="1660" height="430" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_10vswlw_di" bpmnElement="Lane_10vswlw" isHorizontal="true">
+        <dc:Bounds x="220" y="330" width="1630" height="220" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_0ougcvv_di" bpmnElement="Lane_0ougcvv" isHorizontal="true">
+        <dc:Bounds x="220" y="120" width="1630" height="210" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0v82xsa_di" bpmnElement="transform">
+        <dc:Bounds x="940" y="181" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0yibfwb_di" bpmnElement="settings">
+        <dc:Bounds x="379" y="181" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_03ti1bi_di" bpmnElement="index">
+        <dc:Bounds x="1117" y="181" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="start" bioc:stroke="#43a047" bioc:fill="#c8e6c9" color:background-color="#c8e6c9" color:border-color="#43a047">
+        <dc:Bounds x="274" y="203" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="259" y="246" width="71" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_0l754w1" bpmnElement="services">
+        <dc:Bounds x="740" y="399" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1mbrrq0_di" bpmnElement="authenticate">
+        <dc:Bounds x="570" y="399" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_0u9lcvk" bpmnElement="wait">
+        <dc:Bounds x="1302" y="203" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1277" y="246" width="86" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_0jzcv25" bpmnElement="purge">
+        <dc:Bounds x="1420" y="181" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_16qi3dr_di" bpmnElement="cleanup">
+        <dc:Bounds x="1590" y="181" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_10fxhsy_di" bpmnElement="end" bioc:stroke="#e53935" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#e53935">
+        <dc:Bounds x="1752" y="203" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1729" y="246" width="85" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_07nd58u_di" bpmnElement="Flow_07nd58u">
+        <di:waypoint x="840" y="439" />
+        <di:waypoint x="910" y="439" />
+        <di:waypoint x="910" y="221" />
+        <di:waypoint x="940" y="221" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1l3tv0h_di" bpmnElement="Flow_1l3tv0h">
+        <di:waypoint x="479" y="221" />
+        <di:waypoint x="530" y="221" />
+        <di:waypoint x="530" y="439" />
+        <di:waypoint x="570" y="439" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_06nzi8a_di" bpmnElement="Flow_06nzi8a">
+        <di:waypoint x="1040" y="221" />
+        <di:waypoint x="1117" y="221" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0wk332j_di" bpmnElement="Flow_0wk332j">
+        <di:waypoint x="310" y="221" />
+        <di:waypoint x="379" y="221" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0t7vdw4_di" bpmnElement="Flow_0t7vdw4">
+        <di:waypoint x="670" y="439" />
+        <di:waypoint x="740" y="439" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10n8ngo_di" bpmnElement="Flow_10n8ngo">
+        <di:waypoint x="1690" y="221" />
+        <di:waypoint x="1752" y="221" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_03cbmf7" bpmnElement="Flow_1upg7hs">
+        <di:waypoint x="1338" y="221" />
+        <di:waypoint x="1420" y="221" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0so2spd_di" bpmnElement="Flow_0so2spd">
+        <di:waypoint x="1217" y="221" />
+        <di:waypoint x="1302" y="221" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_19bofdm_di" bpmnElement="Flow_19bofdm">
+        <di:waypoint x="1520" y="221" />
+        <di:waypoint x="1590" y="221" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
